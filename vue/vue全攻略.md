@@ -22,6 +22,59 @@
 
 > 组件化和MVVM，响应式原理，vdom和diff算法，模板编译，组件渲染过程，前端路由
 
+##### 响应式原理
+
+```javascript
+// 监听数组
+const oldArrayProperty = Array.prototype;
+// 创建新对象，再扩展不影响原型
+const arrProto = Object.create(oldArrayProperty);
+['push', 'pop', 'shift', 'unshift', 'splice'].forEach(methodName => {
+    arrProto[methodName] = function() {
+        console.log('触发视图更新')
+        oldArrayProperty[methodName].call(this, ...arguments)
+    }
+});
+
+
+// 实现响应式？更改值，触发视图更新，对数组呢？对值呢？
+function useObserve(target) {
+    if (typeof target !== 'object' || target === null) {
+        return target
+    }
+    if (Array.isArray(target)) {
+        target.__proto__ = arrProto
+    }
+    // 重新定义各个属性，for...in 也可以遍历数组
+    for (let key in target) {
+        defineReactive(target, key, target[key])
+    }
+}
+
+// 重新定义属性，监听起来
+function defineReactive(target, key, value) {
+    // 深度监听，避免值为对象
+    useObserve(value)
+    // 核心API
+    Object.defineProperty(target, key, {
+        get() {
+            return value
+        },
+        set(newValue) {
+            if (newValue !== value) {
+                value = newValue
+                // 触发视图更新
+                console.log('触发了')
+            }
+        }
+    })
+}
+
+export default useObserve
+```
+
+
+
 #### vue2 真题演示
 
 > v-for 为什么用key，组件data为什么是函数，何时使用keep-alive，何时需要使用beforeDestory，diff 算法时间复杂度，vue常见性能优化
@@ -73,7 +126,6 @@
 
 > 生成值类型的响应式数据，可用于模板 和 reactive，用过.value 修改值
 >
-> 最佳使用方式：创建时将变量名加上 Ref，例如 const ageRef = ref(20)
 
 ###### toRef 
 
@@ -82,6 +134,29 @@
 ###### roRefs
 
 > 将响应式对象（reactive封装）转换为普通对象；对象的每个prop都是对应的 ref；两者保持引用关系
+
+###### 最佳使用方式
+
+> - 用 reactive 做对象的响应式，用 ref 做值类型响应式
+> - 合成函数返回响应式对象时，使用 toRefs
+> - ref 创建时将变量名加上 xxxRef，例如 const ageRef = ref(20)
+
+###### 进阶，深入理解
+
+> 为何需要 ref；为何需要 .value；为何需要 toRef toRefs；
+
+1. 为何需要 ref
+   1. 返回值类型，会丢失响应式
+   2. 在 setup、computed、合成函数、会有可能返回值类型
+   3. Vue 如果不定义 ref，用户将自造 ref，反而混乱；
+2. 为何需要 .value
+   1. vue 响应式用的是 proxy，只能监听对象类型，ref是一个对象，value存储值
+   2. 用过.value 属性的 get 和 set 实现响应式
+   3. 用于模板、reactive 时，不需要 .value，其他都要
+3. 为何需要 toRef toRefs
+   1. 初衷：返回值类型，不丢失响应式
+   2. 前提：针对的是响应式对象（reactive 封装的） 非普通对象
+   3. 注意：不创造响应式，而是延续响应式
 
 ```javascript
 <template>
@@ -123,3 +198,67 @@ setTimeout(() => {
 </script>
 ```
 
+##### Vue3 升级了哪些重要功能
+
+> createAPP、emits属性、生命周期、多事件、Fragment、移除 .sync、异步组件写法、
+>
+> 移除 filter、Teleport、Suspense、Composition API（reactive,ref 相关,readonly,watch,watchEffect,setup,生命周期钩子)
+
+##### Composition API 实现逻辑复用
+
+> 抽离逻辑代码到一个函数；函数命名约定为 useXxx 函数（React Hooks）；在 setup 中引入 useXxx 函数
+
+```javascript
+import { ref, onMounted, onUnmounted } from 'vue'
+
+function useMousePosition() {
+    let x = ref(0)
+    let y = ref(0)
+
+    function update(e) {
+        x.value = e.pageX
+        y.value = e.pageY
+    }
+
+    onMounted(() => {
+        window.addEventListener('mousemove', update)
+    })
+
+    onUnmounted(() => {
+        window.removeEventListener('mousemove')
+    })
+
+    return {
+        x,
+        y
+    }
+}
+
+export default useMousePosition
+
+/// 使用：
+import useMousePosition from '....'
+const {x, y} = useMousePosition()
+```
+
+##### Vue3 如何实现响应式
+
+> Vue2.x 的 Object.defineProperty；学习 Proxy 语法；Vue3 如何用 Proxy 实现响应式
+
+###### Proxy
+
+> 和 Proxy 能力一一对应； 规范化、标准化、函数式；替代掉 Object 上的工具函数
+
+###### Vue3 如何用 Proxy 实现响应式
+
+> Proxy 能规避 Object.definePropery 的问题；Proxy 无法兼容所有浏览器，无法 polyfill
+
+###### Vue2.x 的 Object.defineProperty
+
+> 深度监听需要一次性递归； 无法监听新增属性 / 删除属性（Vue.set Vue.delete)；
+>
+> 无法原生监听数组，需要特殊处理
+
+###### Proxy 实现响应式
+
+> 基本使用；Reflect；实现响应式
