@@ -73,6 +73,211 @@ function defineReactive(target, key, value) {
 export default useObserve
 ```
 
+##### vdom和diff算法
+
+> 背景：DOM 操作非常耗费性能；Vue 和 React 是数据驱动视图，如何有效控制 DOM 操作，有了一定的复杂度，想减少计算次数比较难；
+
+```javascript
+// JS 模拟 DOM 结构
+<div id="div" class="container">
+    <p style="font-size: 20px"> vdom </p>
+</div>
+
+{
+  tag: 'div',
+  props: {
+    className: 'container',
+    id: 'div'
+  },
+  children: [
+    {
+      tag: 'p',
+      props: {
+        style: 'font-size: 20px'
+      },
+      children: 'vdom'
+    }
+  ]
+}
+
+```
+
+###### 通过 snabbdom 学习 vdom（vdom，数据操作视图，控制DOM）
+
+> Vue 参考它实现的 vdom 和 diff；
+>
+> 利用JS 模拟 DOM结构；新旧 Vnode 对比，得出最小更新范围，最后更新 DOM 
+>
+> vdom核心：h、vnode、patch、diff、key等
+
+###### diff 算法
+
+> diff 算法是 vdom 中最核心、最关键的部分，新旧 tree vdom 对比
+
+1. 如何将O(n^3) 优化到 O(n)   （学习 snabbdom 源码)
+
+   1. 只比较同一层级，不跨级比较
+   2. tag 不相同，则直接删掉重建，不再深度比较
+   3. tag 和 key，两者都相同，则认为是相同节点，不再深度比较
+
+   > patchVnode；addVnodes removeVnodes；updateChildren（key 的重要性）
+
+   ```javascript
+   function sameVnode(vnode1: VNode, vnode2: VNode): boolean {
+     const isSameKey = vnode1.key === vnode2.key;
+     const isSameIs = vnode1.data?.is === vnode2.data?.is;
+     const isSameSel = vnode1.sel === vnode2.sel;
+   
+     return isSameSel && isSameKey && isSameIs;
+   }
+   
+   // patchVnode 核心逻辑
+   function patchVnode(....) {
+     ....
+     if (isUndef(vnode.text)) {
+         if (isDef(oldCh) && isDef(ch)) {
+           if (oldCh !== ch) updateChildren(elm, oldCh, ch, insertedVnodeQueue);
+             // updateChildren 核心.. while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) 
+         } else if (isDef(ch)) {
+           if (isDef(oldVnode.text)) api.setTextContent(elm, "");
+           addVnodes(elm, null, ch, 0, ch.length - 1, insertedVnodeQueue);
+         } else if (isDef(oldCh)) {
+           removeVnodes(elm, oldCh, 0, oldCh.length - 1);
+         } else if (isDef(oldVnode.text)) {
+           api.setTextContent(elm, "");
+         }
+       } else if (oldVnode.text !== vnode.text) {
+         if (isDef(oldCh)) {
+           removeVnodes(elm, oldCh, 0, oldCh.length - 1);
+         }
+         api.setTextContent(elm, vnode.text!);
+       }
+   ```
+
+   
+
+##### 模板编译
+
+> 通过组件渲染和更新过程
+>
+> 核心： vue template complier 将模板编译为 render 函数；执行 render 函数生成 vnode；基于 vnode 再执行 patch 和 diff
+
+###### 模板编译 （vue-compiler)
+
+> 不是html，有指令，插值，js表达式，能实现判断、循环
+>
+> html 是标签语言，只有 JS 才能实现判断、循环（图灵完备）
+
+```javascript
+const compiler = require('vue-template-compiler')
+// 插值
+// const template = `<p>{{message}}</p>`
+// with(this){return createElement('p',[createTextVNode(toString(message))])}
+// h -> vnode
+// createElement -> vnode
+
+// 编译
+const res = compiler.compile(template)
+console.log(res.render)
+
+// ---------------分割线--------------
+
+// 从 vue 源码中找到缩写函数的含义
+function installRenderHelpers (target) {
+    target._o = markOnce;
+    target._n = toNumber;
+    target._s = toString;
+    target._l = renderList;
+    target._t = renderSlot;
+    target._q = looseEqual;
+    target._i = looseIndexOf;
+    target._m = renderStatic;
+    target._f = resolveFilter;
+    target._k = checkKeyCodes;
+    target._b = bindObjectProps;
+    target._v = createTextVNode;
+    target._e = createEmptyVNode;
+    target._u = resolveScopedSlots;
+    target._g = bindObjectListeners;
+    target._d = bindDynamicKeys;
+    target._p = prependModifier;
+}
+```
+
+###### vue 组件中使用 render 代替 template
+
+##### 组件 渲染/更新过程
+
+> 一个组件渲染到页面，修改 data 触发更新（数据驱动视图）；背后原理是什么；
+>
+> 初次渲染过程；更新过程；异步渲染
+
+###### 初次渲染过程
+
+1. 解析模板为 render函数（或在开发环境已完成，vue-loader）
+2. 触发响应式，监听 data 属性 getter setter
+3. 执行 render 函数，生成 vnode，patch(elem, vnode)
+
+###### 更新过程
+
+1. 修改 data，触发 setter（此前在 getter 中已经被监听）
+2. 重新执行 render 函数，生成 newVnode
+3. patch(vnode，newVnode)
+
+###### 异步渲染
+
+1. vue 会汇总 data 修改，一次性更新视图（$nextTick）
+2. 减少DOM操作，提升性能
+
+##### 前端路由原理
+
+网页 url 组成部分
+
+```javascript
+hash: "#/"
+host: "localhost:3000"
+hostname: "localhost"
+href: "http://localhost:3000/#/"
+origin: "http://localhost:3000"
+pathname: "/"
+port: "3000"
+protocol: "http:"
+```
+
+1. hash 的特点
+   1. hash 变化会触发网页跳转，即浏览器的前进、后退
+   2. hash 变化不会刷新页面，SPA必需的特点
+   3. hash 永远不会提交到 server 端
+
+```js
+ // hash 变化，包括：
+ // a. JS 修改 url
+ // b. 手动修改 url 的 hash
+ // c. 浏览器前进、后退
+ window.onhashchange = (event) => {
+	console.log('old url', event.oldURL)
+ 	console.log('new url', event.newURL)
+	console.log('hash:', location.hash)
+}
+```
+
+1. H5 history 的特点
+
+```javascript
+// 打开一个新的路由
+// 【注意】用 pushState 方式，浏览器不会刷新页面
+document.getElementById('btn1').addEventListener('click', () => {
+    const state = { name: 'page1' }
+    console.log('切换路由到', 'page1')
+    history.pushState(state, '', 'page1') // 重要！！
+})
+
+// 监听浏览器前进、后退
+window.onpopstate = (event) => { // 重要！！
+    console.log('onpopstate', event.state, location.pathname)
+}
+```
+
 
 
 #### vue2 真题演示
