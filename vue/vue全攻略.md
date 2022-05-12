@@ -1,6 +1,4 @@
-## vue2
-
-### 基础
+### vue2
 
 #### 基本使用
 
@@ -284,11 +282,43 @@ window.onpopstate = (event) => { // 重要！！
 
 > v-for 为什么用key，组件data为什么是函数，何时使用keep-alive，何时需要使用beforeDestory，diff 算法时间复杂度，vue常见性能优化
 
-## vue3
+###### 何时需要使用 keep-alive？
+
+> 缓存组件，不需要重复渲染；如多个静态tab页的切换；优化性能
+
+###### 何时需要使用 beforeDestory?
+
+> 解绑自定义事件 event.$off；清除定时器；解绑自定义的DOM事件，如window scroll等
+
+###### 什么是作用域插槽？
+
+###### Vuex中 action 和 mutation有何区别？
+
+> action中处理异步，mutation不可以；mutation做原子操作；action 可以整合多个mutation
+
+###### Vue-router 常用的路由模式？
+
+> hash默认；H5 history（需要服务端支持）
+
+###### 如何配置Vue-router 异步加载？
+
+###### Vue 如何监听数组变化？
+
+> Object.defineProperty 不能监听数组变化；重新定义原型，重写push pop等方法，实现监听Proxy 可以原生支持监听数组变化
+
+###### Vue 常见性能优化
+
+> 合理使用 v-show 和 v-if；合理使用 computed；v-for 时加 key, 以及避免和 v-if 同时使用；自定义事件、DOM事件及时销毁；合理使用异步组件；合理使用 keep-alive；Data 层级不要太深；使用 vue-loader 在开发环境下做模板编译；Webpack 层面的优化
+
+### vue3
 
 #### vue3新功能
 
 > createApp，emits属性，多事件处理，Fragment，移除.sync 改为 v-model 参数，异步组件的引入方式，移除filter，Teleport，Suspense，Composition API
+
+##### 移除 .sync
+
+> 移除.sync 改为 使用 v-model:...某某改变值
 
 #### vue3真题演示
 
@@ -467,3 +497,155 @@ const {x, y} = useMousePosition()
 ###### Proxy 实现响应式
 
 > 基本使用；Reflect；实现响应式
+
+1. Reflect 作用
+
+   > - 和 Proxy 能力一一对应
+   > - 规范化、标准化、函数式
+   > - 代替 Object 一些工具函数（Object 专心作为一个数据，工具函数 Reflect 是工具函数）
+
+##### watch,watchEffect 区别
+
+> 两者都可监听 data 属性变化；watch 需要明确监听哪个属性；watchEffect 会根据其中的属性，自动监听其变化，初始化一定会执行一次
+
+```javascript
+// 里面写到什么值就监听什么值
+watchEffect(() => {
+    // 初始化一定会执行一次，为了收集需要监听执行的数据
+    console.log('state.age', state.age)
+    console.log('state.name', state.name)
+})
+// 监听 ref
+watch(numberRef, (newNumber, oldNumber) => {
+    console.log('ref watch', newNumber, oldNumber)
+}
+, {
+    immediate: true // 初始化之前就监听，可选
+}
+)
+// 监听 reactive 某个属性值
+watch(
+    // 第一个参数，确定要监听哪个属性
+    () => state.age,
+
+    // 第二个参数，回调函数
+    (newAge, oldAge) => {
+        console.log('state watch', newAge, oldAge)
+    },
+
+    // 第三个参数，配置项
+    {
+        immediate: true, // 初始化之前就监听，可选
+        // deep: true // 深度监听
+    }
+)
+```
+
+##### setup 中如何获取组件实例
+
+> 在 setup 和其他 Composition API 中没有this；可通过 getCurrentInstance 获取当前实例；若使用 Options API 可照常使用 this
+
+##### Vue3 为什么比 Vue2 快（**[Vue 3 Template Explorer](https://template-explorer.vuejs.org/)**  --- 对整个流程，而不是针对某一个点）
+
+> Proxy 响应式；PatchFlag；hoistStatic；CacheHandler；SSR 优化；tree-shaking
+
+###### PatchFlag（对模板节点做标记）
+
+> 编译模板时，动态节点做标记； 标记分为不同类型，如 TEXT PROPS；diff 算法时，可以区分静态节点，以及不同类型的动态节点
+
+###### hoistStatic、CacheHandler
+
+> hoistStatic：将静态节点的定义，提升到父作用域，缓存起来；多个相邻的静态节点，会被合并；典型的拿空间换时间的优化策略；
+>
+> CacheHandler：缓存事件
+
+###### SSR 优化、tree-shaking
+
+> SSR 优化：静态节点直接输出，绕过 vdom；动态节点，还是需要动态渲染；
+>
+> tree-shaking：根据模板里面内容，动态 import 需要内容
+
+##### Vite 为什么这么快
+
+> 开发环境使用 ES6 Module，无需打包 —— 非常快（webpack 需要打包成 ES5）
+>
+> 生产环境使用 rollup，不会快很多 
+
+```javascript
+<script type="module"> // 基本演示
+	import add from './src/add.js'
+	import { add, multi } from './src/math.js'
+</script> 
+<script type="module" src="./src/index.js"></script> // 外链
+<script type="module"> // 远程引用
+	import { createStore } from 'https://unpkg.com/redux@latest/es/redux.mjs'
+</script>
+<script type="module"> // 动态引用
+document.getElementById('btn1').addEventListener('click', async () => {
+	const add = await import('./src/add.js')
+	const res = add.default(1, 2)
+})
+document.getElementById('btn2').addEventListener('click', async () => {
+	const { add, multi } = await import('./src/math.js')
+})
+</script>
+```
+
+##### Vue3 script setup（vue vision>= 3.2.0)
+
+> composition API 最重要的是 setup 函数（只是一个语法糖，减少一层嵌套）
+
+###### 基本使用
+
+> 顶级变量、自定义组件，可以直接用于模板，不再需要返回变量和自定义组件；可正常使用 ref reactive computed等能力；和其他<script>同时使用
+
+###### 属性和事件
+
+> defineProps；defineEmits；
+
+```javascript
+<script setup>
+import { defineProps, defineEmits } from 'vue'
+
+// 定义属性
+const props = defineProps({
+    name: String,
+    age: Number
+})
+
+// 定义事件
+const emit = defineEmits(['change', 'delete'])
+function deleteHandler() {
+    emit('delete', 'aaa')
+}
+
+</script>
+
+<template>
+    <p>Child2 - name: {{props.name}}, age: {{props.age}}</p>
+    <button @click="$emit('change', 'bbb')">change</button>
+    <button @click="deleteHandler">delete</button>
+</template>
+```
+
+###### defineExpose
+
+> 暴露属性给父组件
+
+```javascript
+// 子组件 setup 暴露
+defineExpose({
+    a,
+    b
+})
+// 父组件
+import Child3 from './Child3'
+const child3Ref = ref(null)
+onMounted(() => {
+    // 拿到 Child3 组件的一些数据
+    console.log(child3Ref.value)
+    console.log(child3Ref.value.a)
+    console.log(child3Ref.value.b)
+})
+```
+
